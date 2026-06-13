@@ -1,6 +1,7 @@
-# 分布式翻译框架
+# Distra — 分布式翻译框架
 
 **解决什么问题**：本地批量翻译，数据不出局域网，支持用多台旧电脑并行加速。
+（[English version](README_en.md)）
 
 ## 痛点
 
@@ -242,5 +243,6 @@ New-NetFirewallRule -DisplayName "DistributedTranslator" -Direction Inbound -Loc
 ├── start_master.bat     # 启动主机
 ├── start_slave.bat      # 启动从机
 ├── install_env.bat      # 安装依赖
-└── Modelfile.hunyuan    # GGUF 导入示例
+├── Modelfile.hunyuan    # GGUF 导入示例
+└── README_en.md         # English version
 ```
