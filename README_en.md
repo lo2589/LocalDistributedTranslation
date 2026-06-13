@@ -41,59 +41,62 @@ Client ──POST /translate──> Master :8000 ──round-robin──> Slave 
 
 ## Installation
 
-### Master (the router machine)
+### Recommended flow: install Slaves first, then Master
 
-**1. Install Python dependencies**
-
-```bash
-# Option A: Auto-install (recommended)
-# Right-click install_env.bat → Run as administrator
-install_env.bat
-
-# Option B: Manual (if you already have 64-bit Python)
-pip install fastapi uvicorn httpx pydantic pyyaml
+```
+Each translation machine: run install_slave.bat
+   ↓
+  6-step self-test passes → shows local IP
+   ↓
+Copy the IP to the Master machine
+   ↓
+Master machine: run install_master.bat
+   ↓
+  Enter Slave IPs line by line → Master verifies connections
+   ↓
+  Ready
 ```
 
-**2. Start**
+### Slave (each translation machine)
 
 ```bash
-start_master.bat
-# Or manually
-python -m uvicorn master.master:app --host 0.0.0.0 --port 8000
+install_slave.bat
 ```
 
-### Slave (each worker machine)
+The script **automatically**:
+1. Checks Python 64-bit
+2. Installs pip dependencies
+3. Detects/starts Ollama
+4. Downloads Hunyuan 1.8B Q4 model
+5. Starts Slave service in background
+6. Runs 5-paragraph parallel translation self-test
+7. ✅ On success, displays the local IP
 
-**1. Install Ollama**
-
-Download: https://ollama.com/download
-
-Or via command line:
-```powershell
-# Windows PowerShell (admin)
-irm https://ollama.com/install.ps1 | iex
-```
-
-**2. Download translation model**
+### Master (router machine)
 
 ```bash
-# Hunyuan 1.8B Q4 quantized (1.1GB, recommended)
-ollama pull tencent/hy-mt1.5-1.8b-q4
-
-# Fallback: Qwen2.5 7B (4.7GB, better quality but slower)
-ollama pull qwen2.5:7b
-
-# Fallback: Import local GGUF (if you already have the file)
-# Put GGUF in the project dir, then:
-ollama create hunyuan-mt:1.8b-q4 -f Modelfile.hunyuan
+install_master.bat
 ```
 
-**3. Start Slave**
+The script **automatically**:
+1. Checks Python 64-bit
+2. Installs pip dependencies
+3. Starts Master in background
+4. Self-tests the `/health` endpoint
+5. **Prompts for Slave IPs line by line** (e.g. `192.168.1.101:8001`, Enter to finish)
+6. Writes to `master/config.yaml` and pings each Slave
+
+### Client Usage
 
 ```bash
-start_slave.bat
-# Or manually
-python -m uvicorn slave.slave:app --host 0.0.0.0 --port 8001
+# Install on other machines that need to access Master
+pip install localtrans
+localtrans-save http://192.168.1.100:8000
+```
+
+```python
+from localtrans import translate
+print(translate("Hello world", target_lang="zh"))  # 你好世界
 ```
 
 ## Usage

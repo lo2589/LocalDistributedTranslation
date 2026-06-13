@@ -38,59 +38,62 @@ Client ──POST /translate──> Master :8000 ──轮询负载均衡──>
 
 ## 安装
 
-### Master（主机）
+### 推荐流程：先装 Slave，再装 Master
 
-**1. 安装 Python 依赖**
-
-```bash
-# 方式一：自动安装（推荐）
-# 右键 install_env.bat → 以管理员身份运行
-install_env.bat
-
-# 方式二：手动安装（已有 Python 64-bit 时）
-pip install fastapi uvicorn httpx pydantic pyyaml
+```
+每台翻译机器：运行 install_slave.bat
+   ↓
+  自检 6 步全过 → 显示本机 IP
+   ↓
+把 IP 抄到 Master 那台机器
+   ↓
+Master 机器：运行 install_master.bat
+   ↓
+  逐行输入 Slave IP → Master 验证连接
+   ↓
+  全部就绪
 ```
 
-**2. 启动**
+### Slave（每台翻译机器）
 
 ```bash
-start_master.bat
-# 或手动
-python -m uvicorn master.master:app --host 0.0.0.0 --port 8000
+install_slave.bat
 ```
 
-### Slave（从机，每台机器都要装）
+脚本会**自动完成**：
+1. 检测 Python 64-bit
+2. 装 pip 依赖
+3. 检测/启动 Ollama
+4. 下载混元 1.8B Q4 模型
+5. 后台启动 Slave 服务
+6. 并行翻译 5 段自测
+7. ✅ 通过后显示本机 IP
 
-**1. 安装 Ollama**
-
-下载地址：https://ollama.com/download
-
-或命令行：
-```powershell
-# Windows PowerShell
-irm https://ollama.com/install.ps1 | iex
-```
-
-**2. 下载翻译模型**
+### Master（路由机器）
 
 ```bash
-# 混元 1.8B Q4 量化（1.1GB，推荐）
-ollama pull tencent/hy-mt1.5-1.8b-q4
-
-# 备选：通义千问 7B（4.7GB，质量好但慢）
-ollama pull qwen2.5:7b
-
-# 备选：本地 GGUF 导入（已有 GGUF 文件时）
-# 先把 GGUF 文件放到本目录，然后：
-ollama create hunyuan-mt:1.8b-q4 -f Modelfile.hunyuan
+install_master.bat
 ```
 
-**3. 启动 Slave**
+脚本会**自动完成**：
+1. 检测 Python 64-bit
+2. 装 pip 依赖
+3. 后台启动 Master
+4. 自测 `/health` 端点
+5. **逐行提示输入 Slave IP**（如 `192.168.1.101:8001`，回车结束）
+6. 写入 `master/config.yaml` 并 ping 验证
+
+### 客户端调用
 
 ```bash
-start_slave.bat
-# 或手动
-python -m uvicorn slave.slave:app --host 0.0.0.0 --port 8001
+# 在其他机器上安装（需要能访问 Master）
+pip install localtrans
+localtrans-save http://192.168.1.100:8000
+```
+
+```python
+from localtrans import translate
+print(translate("Hello world", target_lang="zh"))  # 你好世界
 ```
 
 ## 使用

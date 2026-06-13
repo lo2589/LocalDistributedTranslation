@@ -42,13 +42,14 @@ vllm = ["vllm>=0.3.0"]
 dev = ["pytest>=7.0", "black>=23.0"]
 
 [project.scripts]
-dt-master = "master.master:main"
-dt-slave = "slave.slave:main"
+localtrans-master = "master.master:main"
+localtrans-slave = "slave.slave:main"
+localtrans-save = "localtrans.config:save_master_url_cli"
 
 [project.urls]
-Homepage = "https://github.com/distributed-translator"
-Repository = "https://github.com/distributed-translator"
+Homepage = "https://github.com/localtrans/localtrans"
+Repository = "https://github.com/localtrans/localtrans"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["common*", "master*", "slave*"]
+include = ["common*", "master*", "slave*", "localtrans*"]
