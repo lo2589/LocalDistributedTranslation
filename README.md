@@ -1,4 +1,4 @@
-# Distra — 分布式翻译框架
+# Local Distributed Translation
 
 **解决什么问题**：本地批量翻译，数据不出局域网，支持用多台旧电脑并行加速。
 （[English version](README_en.md)）

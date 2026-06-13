@@ -1,11 +1,11 @@
 @echo off
-REM Distra - 分布式翻译框架 一键安装脚本
+REM Local Distributed Translation - 一键安装脚本
 REM 功能：检测硬件 → 评估容量 → 生成配置 → 安装依赖
 
 setlocal enabledelayedexpansion
 
 echo ============================================
-echo   Distra  一键安装
+echo   Local Distributed Translation  一键安装
 echo ============================================
 echo.
 

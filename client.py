@@ -3,7 +3,7 @@
 提供简洁的 Python API 调用 Master 翻译服务
 
 用法:
-    from distributed_translator import TranslatorClient
+    from localtrans import TranslatorClient
 
     client = TranslatorClient("http://localhost:8000")
     result = client.translate("Hello world", target_lang="zh")

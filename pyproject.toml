@@ -3,9 +3,9 @@ requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "distributed-translator"
+name = "localtrans"
 version = "0.1.0"
-description = "分布式小模型翻译器 - 支持专业翻译模型的 Master/Slave 分布式架构"
+description = "Local Distributed Translation - 本地分布式翻译，多机并行 Master/Slave 架构"
 readme = "README.md"
 requires-python = ">=3.8"
 license = {text = "MIT"}

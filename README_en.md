@@ -1,4 +1,4 @@
-# Distra — Distributed Translation Framework
+# Local Distributed Translation
 
 **What it solves**: Local batch translation, data never leaves your LAN, leverage multiple machines in parallel.
 
