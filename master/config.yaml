@@ -1,0 +1,68 @@
+master:
+  host: "0.0.0.0"
+  port: 8000
+
+  # 从机节点列表 / Slave Nodes
+  # 即使是一台机器跑多个实例，也按多个节点配置不同端口即可
+  slaves:
+    - name: "slave-1"
+      url: "http://192.168.1.101:8001"
+      weight: 1
+    - name: "slave-2"
+      url: "http://192.168.1.101:8002"
+      weight: 1
+    - name: "slave-3"
+      url: "http://192.168.1.102:8001"
+      weight: 1
+
+  # 健康检查配置
+  health_check:
+    interval: 30    # 秒，轮询周期
+    timeout: 5      # 秒，单次请求超时
+
+  # 推荐模型列表（供 /models/recommendations 接口返回）
+  # 均为专业翻译模型，HuggingFace 原生格式，transformers/vLLM 直接加载
+  recommended_models:
+    - id: "tencent/hy-mt2-1.8b"
+      name: "混元翻译 Hy-MT2-1.8B"
+      params: "1.8B"
+      memory_fp16: "3.6GB"
+      memory_4bit: "0.9GB"
+      memory_125bit: "440MB"
+      description: "强烈推荐。腾讯最新专业翻译模型，33种语言，支持术语干预、格式化保留、上下文翻译。1.8B 质量超过豆包/微软商业 API。"
+    - id: "tencent/hy-mt2-7b"
+      name: "混元翻译 Hy-MT2-7B"
+      params: "7B"
+      memory_fp16: "14GB"
+      memory_4bit: "3.5GB"
+      description: "7B 版本，专业领域（金融/法律/医学）优化，质量超过 DeepSeek-V4-Pro 快思模式。"
+    - id: "facebook/nllb-200-distilled-1.3B"
+      name: "NLLB-200 1.3B"
+      params: "1.3B"
+      memory_fp16: "2.6GB"
+      memory_4bit: "0.7GB"
+      description: "Meta 出品，200+ 语言覆盖，小语种/低资源语言最优选择。"
+    - id: "facebook/nllb-200-distilled-3.3B"
+      name: "NLLB-200 3.3B"
+      params: "3.3B"
+      memory_fp16: "6.6GB"
+      memory_4bit: "1.8GB"
+      description: "NLLB 蒸馏版 3.3B，质量更好，适合中等配置机器。"
+    - id: "google/madlad-400-3b-mt"
+      name: "MADLAD-400 3B"
+      params: "3B"
+      memory_fp16: "6GB"
+      memory_4bit: "1.5GB"
+      description: "Google 出品，400+ 语言，文档翻译稳定。"
+    - id: "facebook/m2m100_1.2B"
+      name: "M2M-100 1.2B"
+      params: "1.2B"
+      memory_fp16: "2.4GB"
+      memory_4bit: "0.6GB"
+      description: "Meta 经典多对多翻译模型，100 种语言，速度快，实时场景友好。"
+    - id: "Qwen/Qwen2.5-1.5B-Instruct"
+      name: "Qwen2.5-1.5B"
+      params: "1.5B"
+      memory_fp16: "3.2GB"
+      memory_4bit: "0.9GB"
+      description: "通用对话模型备选，中英翻译效果好，model_type 需设为 chat。"

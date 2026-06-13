@@ -1,0 +1,54 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "distributed-translator"
+version = "0.1.0"
+description = "分布式小模型翻译器 - 支持专业翻译模型的 Master/Slave 分布式架构"
+readme = "README.md"
+requires-python = ">=3.8"
+license = {text = "MIT"}
+authors = [
+    {name = "Distributed Translator Team"},
+]
+keywords = ["translation", "distributed", "nlp", "transformers", "llm"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+dependencies = [
+    "fastapi>=0.100",
+    "uvicorn>=0.23",
+    "httpx>=0.24",
+    "pydantic>=2.0",
+    "PyYAML>=6.0",
+    "transformers>=4.30",
+    "torch>=2.0",
+    "accelerate>=0.20",
+    "bitsandbytes>=0.41",
+    "huggingface-hub>=0.16",
+]
+
+[project.optional-dependencies]
+vllm = ["vllm>=0.3.0"]
+dev = ["pytest>=7.0", "black>=23.0"]
+
+[project.scripts]
+dt-master = "master.master:main"
+dt-slave = "slave.slave:main"
+
+[project.urls]
+Homepage = "https://github.com/distributed-translator"
+Repository = "https://github.com/distributed-translator"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["common*", "master*", "slave*"]

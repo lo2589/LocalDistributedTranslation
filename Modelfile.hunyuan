@@ -1,0 +1,8 @@
+FROM "F:/projects/分布式翻译/HY-MT1.5-1.8B-Q4_K_M.gguf"
+
+PARAMETER stop "<|hy_place|><|holder|><|no|><|/>|"
+PARAMETER stop "<|hy_End|>"
+PARAMETER temperature 0.3
+PARAMETER num_ctx 2048
+
+SYSTEM "你是一个专业翻译助手，遵循术语表翻译成目标语言。"

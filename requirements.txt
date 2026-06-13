@@ -1,0 +1,21 @@
+# 分布式翻译器 - 依赖清单
+# 兼容 Python 3.8-3.11 (64-bit)
+
+# 核心服务
+fastapi>=0.100.0
+uvicorn[standard]>=0.23.0
+pydantic>=2.0.0
+PyYAML>=6.0
+httpx>=0.24.0
+
+# 模型推理（PyTorch 64-bit only）
+torch>=2.0.0
+transformers>=4.37.0
+accelerate>=0.20.0
+huggingface-hub>=0.16.0
+
+# 可选：4bit 量化
+# bitsandbytes>=0.41.0
+
+# 可选：vLLM 后端（高性能推理）
+# vllm>=0.3.0

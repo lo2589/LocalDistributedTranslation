@@ -1,0 +1,47 @@
+# 虚拟环境
+.venv/
+.env/
+
+# 本地 pip 依赖包（用户自行装）
+.deps/
+.deps37/
+
+# Python 编译产物
+__pycache__/
+*.py[cod]
+*.egg-info/
+*.pyc
+*.pyo
+
+# 测试临时文件
+test_tmp/
+
+# 模型文件（太大，不加入 git）
+*.gguf
+*.gguf.*
+
+# 临时 llama.cpp 二进制
+llama-b9263/
+llama-b9263.zip
+llama-bin/
+
+# 日志文件
+*.log
+logs/
+*.log.*
+
+# 测试结果
+*.txt
+!requirements.txt
+
+# 系统文件
+.DS_Store
+Thumbs.db
+
+# HuggingFace 模型缓存（可选，运行时下载）
+# models/
+
+# 构建产物
+dist/
+build/
+*.whl
