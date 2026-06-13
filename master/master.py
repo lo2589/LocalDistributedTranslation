@@ -8,11 +8,34 @@
 import os
 import sys
 import yaml
+import logging
 import asyncio
 import httpx
 from datetime import datetime
 from typing import List, Optional
 from contextlib import asynccontextmanager
+
+# ===== 统一日志配置（所有输出进 logs/master.log + stderr）=====
+_LOG_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "logs")
+os.makedirs(_LOG_DIR, exist_ok=True)
+_LOG_PATH = os.path.join(_LOG_DIR, "master.log")
+
+# 每次启动清空旧日志，避免无限增长
+try:
+    open(_LOG_PATH, "w").close()
+except Exception:
+    pass
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="[%(asctime)s] [%(levelname)s] [Master] %(message)s",
+    handlers=[
+        logging.FileHandler(_LOG_PATH, encoding="utf-8"),
+        logging.StreamHandler(sys.stderr),
+    ],
+    force=True,
+)
+logger = logging.getLogger("master")
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from common.schemas import TranslateRequest, SlaveInfo
@@ -71,7 +94,7 @@ async def health_checker():
             except Exception as e:
                 s.healthy = False
                 s.last_check = datetime.now().isoformat()
-                print(f"[{datetime.now().isoformat()}] [健康检查] {s.name} 异常: {e}")
+                logger.warning(f"{s.name} 异常: {e}")
 
 
 # ==================== FastAPI 生命周期 ====================
@@ -100,18 +123,18 @@ async def lifespan(app: FastAPI):
             s.model_name = data.get("model_name")
         except Exception as e:
             s.healthy = False
-            print(f"[{datetime.now().isoformat()}] [启动检查] {s.name} 不可达: {e}")
+            logger.warning(f"{s.name} 不可达: {e}")
         s.last_check = datetime.now().isoformat()
 
     asyncio.create_task(health_checker())
-    print(f"[{datetime.now().isoformat()}] [Master] 已注册 {len(slaves)} 个从机节点")
+    logger.info(f"已注册 {len(slaves)} 个从机节点")
     if recommended_models:
-        print(f"[{datetime.now().isoformat()}] [Master] 已加载 {len(recommended_models)} 个推荐模型配置")
+        logger.info(f"已加载 {len(recommended_models)} 个推荐模型配置")
 
     yield
 
     await client.aclose()
-    print("[Master] 服务已关闭")
+    logger.info("服务已关闭")
 
 
 app = FastAPI(title="分布式翻译主机", lifespan=lifespan)

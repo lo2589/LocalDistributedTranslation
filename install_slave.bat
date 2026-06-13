@@ -1,194 +1,211 @@
 @echo off
-REM Local Distributed Translation - Slave 安装脚本
-REM 功能：6 步自检 + 后台挂载 + 显示本机 IP
-
 setlocal enabledelayedexpansion
 
-set SLAVE_PORT=8001
-set TEST_PARAGRAPHS=5
-set TEST_TIMEOUT=60
-
-echo ============================================
-echo   Local Distributed Translation - Slave 安装
-echo ============================================
-echo.
-
-REM ============ 步骤 1: Python 64-bit 检测 ============
-echo [1/6] 检测 Python 64-bit...
-where python >nul 2>&1
-if %errorlevel% neq 0 (
-    echo [错误] 未检测到 Python
-    echo        下载: https://www.python.org/downloads/windows/
-    echo        安装时勾选 "Add Python to PATH"
-    pause
-    exit /b 1
-)
-for /f "tokens=2" %%i in ('python -c "import struct; print(struct.calcsize('P')*8)"') do set PYTHON_BITS=%%i
-if not "!PYTHON_BITS!"=="64" (
-    echo [错误] 当前 Python 是 !PYTHON_BITS! 位，必须用 64 位
-    echo        下载 64-bit: https://www.python.org/downloads/windows/
-    pause
-    exit /b 1
-)
-echo        [OK] Python 64-bit
-
-REM ============ 步骤 2: 装依赖 ============
-echo.
-echo [2/6] 安装依赖...
-if not exist .venv (
-    python -m venv .venv
-    if %errorlevel% neq 0 (
-        echo [错误] 虚拟环境创建失败
-        pause
-        exit /b 1
-    )
-)
-.venv\Scripts\python.exe -m pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple >nul 2>&1
-.venv\Scripts\python.exe -m pip config set install.trusted-host pypi.tuna.tsinghua.edu.cn >nul 2>&1
-.venv\Scripts\python.exe -m pip install --quiet fastapi uvicorn httpx pydantic pyyaml
-if %errorlevel% neq 0 (
-    echo [错误] 依赖安装失败
-    pause
-    exit /b 1
-)
-echo        [OK] 依赖已就绪
-
-REM ============ 步骤 3: Ollama 检测 ============
-echo.
-echo [3/6] 检测 Ollama...
-where ollama >nul 2>&1
-if %errorlevel% neq 0 (
-    echo [错误] 未检测到 Ollama
-    echo        下载: https://ollama.com/download
-    pause
-    exit /b 1
-)
-
-REM 检查 Ollama 服务在跑
-curl -s --max-time 3 http://127.0.0.1:11434/api/tags >nul 2>&1
-if %errorlevel% neq 0 (
-    echo        启动 Ollama 服务...
-    start "OllamaService" /min ollama serve
-    timeout /t 5 /nobreak >nul
-    curl -s --max-time 3 http://127.0.0.1:11434/api/tags >nul 2>&1
-    if %errorlevel% neq 0 (
-        echo [错误] Ollama 启动失败，请手动运行: ollama serve
-        pause
-        exit /b 1
-    )
-)
-echo        [OK] Ollama 运行中
-
-REM ============ 步骤 4: 模型下载 ============
-echo.
-echo [4/6] 检查/下载模型 hunyuan-mt:1.8b-q4 (1.1GB)...
-ollama list | find "hunyuan-mt:1.8b-q4" >nul 2>&1
-if %errorlevel%==0 (
-    echo        [跳过] 模型已存在
-) else (
-    echo        正在下载（可能需要 5-30 分钟）...
-    ollama pull tencent/hy-mt1.5-1.8b-q4
-    if %errorlevel% neq 0 (
-        echo [错误] 模型下载失败
-        echo        可手动重试: ollama pull tencent/hy-mt1.5-1.8b-q4
-        pause
-        exit /b 1
-    )
-)
-echo        [OK] 模型已就绪
-
-REM ============ 步骤 5: 启动 Slave 服务（后台）============
-echo.
-echo [5/6] 启动 Slave 服务（端口 !SLAVE_PORT!）...
-REM 先 kill 已有的
-for /f "tokens=5" %%a in ('netstat -ano ^| findstr ":!SLAVE_PORT! " 2^>nul') do taskkill /F /PID %%a >nul 2>&1
+REM ============================================================
+REM Local Distributed Translation - Slave 6-step self-test
+REM Steps:
+REM   1. Detect Python 64-bit
+REM   2. Install pip dependencies
+REM   3. Detect / start Ollama + pull model
+REM   4. Start Slave service (background)
+REM   5. Parallel translation self-test
+REM   6. Show local IP (ready to be added to Master)
+REM ============================================================
 
 cd /d "%~dp0"
-start "LocalTrans-Slave" /min cmd /c ".venv\Scripts\python.exe -m uvicorn slave.slave:app --host 0.0.0.0 --port !SLAVE_PORT! > slave.log 2>&1"
 
-REM 等待服务起来
-echo        等待服务启动...
-set /a WAIT_COUNT=0
+set PORT=8001
+set PARAGRAPHS=5
+set OLLAMA_MODEL=tencent/hy-mt1.5-1.8b-q4
+
+echo.
+echo ============================================
+echo   Local Distributed Translation - Slave
+echo ============================================
+echo.
+
+REM ============ Step 1: Python 64-bit ============
+echo [1/6] Checking Python 64-bit...
+if defined PYTHON (
+    set "PYEXE=!PYTHON!"
+) else (
+    where python >nul 2>nul
+    if errorlevel 1 (
+        echo [ERROR] Python not found in PATH
+        echo         Download: https://www.python.org/downloads/windows/
+        echo         Or set PYTHON env var to a 64-bit Python path:
+        echo             set PYTHON=C:\Path\To\python.exe
+        pause
+        exit /b 1
+    )
+    set "PYEXE=python"
+)
+
+"!PYEXE!" scripts\check_python.py
+if errorlevel 1 (
+    echo [ERROR] Python detection script failed
+    pause
+    exit /b 1
+)
+for /f "delims=" %%i in ('"!PYEXE!" scripts\check_python.py') do set BITS=%%i
+if not "!BITS!"=="64" (
+    echo [ERROR] Python is !BITS!-bit, must be 64-bit
+    echo         Current: !PYEXE!
+    echo         Set PYTHON env var to 64-bit Python, e.g.:
+    echo             set PYTHON=C:\Path\To\python.exe
+    pause
+    exit /b 1
+)
+echo        OK (64-bit: !PYEXE!)
+
+REM ============ Step 2: Install deps ============
+echo.
+echo [2/6] Installing pip dependencies (fastapi uvicorn httpx pyyaml)...
+"!PYEXE!" -m pip install --quiet --disable-pip-version-check fastapi uvicorn httpx pydantic pyyaml
+if errorlevel 1 (
+    echo [ERROR] pip install failed, trying with --user ...
+    "!PYEXE!" -m pip install --user --quiet --disable-pip-version-check fastapi uvicorn httpx pydantic pyyaml
+    if errorlevel 1 (
+        echo [ERROR] pip install failed even with --user
+        pause
+        exit /b 1
+    )
+)
+echo        OK
+
+REM ============ Step 3: Ollama check ============
+echo.
+echo [3/6] Checking Ollama and model (%OLLAMA_MODEL%)...
+"!PYEXE!" scripts\check_ollama.py %OLLAMA_MODEL%
+set OLLAMA_RC=!errorlevel!
+
+if !OLLAMA_RC!==1 (
+    echo [ERROR] Ollama not installed
+    echo         Download: https://ollama.com/download
+    pause
+    exit /b 1
+)
+if !OLLAMA_RC!==2 (
+    echo        Ollama not running, starting...
+    start "Ollama" /min ollama serve
+    echo        Waiting 8 seconds for Ollama to start...
+    timeout /t 8 /nobreak >nul
+    REM 再次检查
+    "!PYEXE!" scripts\check_ollama.py %OLLAMA_MODEL% >nul 2>&1
+    set RETRY_RC=!errorlevel!
+    if !RETRY_RC!==1 (
+        echo [ERROR] Ollama still not running after start
+        echo         Please run manually: ollama serve
+        pause
+        exit /b 1
+    )
+    set OLLAMA_RC=!RETRY_RC!
+)
+if !OLLAMA_RC!==3 (
+    echo        Model not found, pulling %OLLAMA_MODEL% ...
+    ollama pull %OLLAMA_MODEL%
+    if errorlevel 1 (
+        echo [ERROR] Model pull failed (network issue?)
+        echo         Try again with: ollama pull %OLLAMA_MODEL%
+        pause
+        exit /b 1
+    )
+)
+echo        OK (model: %OLLAMA_MODEL%)
+
+REM ============ Step 4: Start Slave (background) ============
+echo.
+echo [4/6] Starting Slave service (port !PORT!)...
+
+REM 如果端口被占用，杀掉旧进程
+for /f "tokens=5" %%a in ('netstat -ano 2^>nul ^| findstr ":!PORT! "') do (
+    echo        Killing old process on port !PORT! (PID=%%a)...
+    taskkill /F /PID %%a >nul 2>&1
+    timeout /t 2 /nobreak >nul
+)
+
+REM 启动 Slave 服务：使用 PYEXE，让 Python 从项目根目录运行
+REM 日志统一放到 logs\，启动前清理旧日志
+if not exist logs (
+    mkdir logs
+)
+if exist logs\slave.log (
+    del /q logs\slave.log
+)
+set "PYTHONPATH=%~dp0;!PYTHONPATH!"
+start "LocalTrans-Slave" /min cmd /c ""!PYEXE!" -m uvicorn slave.slave:app --host 0.0.0.0 --port !PORT! > logs\slave.log 2>&1"
+
+echo        Waiting for service to come online...
+set /a WAIT=0
 :wait_slave
 timeout /t 2 /nobreak >nul
-curl -s --max-time 2 http://127.0.0.1:!SLAVE_PORT!/health >nul 2>&1
-if %errorlevel%==0 goto slave_ready
-set /a WAIT_COUNT+=1
-if !WAIT_COUNT! GEQ 15 (
-    echo [错误] Slave 启动超时（30秒）
-    echo        查看日志: slave.log
+curl -s --max-time 2 http://127.0.0.1:!PORT!/health >nul 2>&1
+if not errorlevel 1 goto slave_ready
+set /a WAIT+=1
+if !WAIT! GEQ 20 (
+    echo [ERROR] Slave startup timeout (40s)
+    echo         Check logs\slave.log for details:
+    if exist logs\slave.log (
+        echo        ---------------- logs\slave.log ----------------
+        type logs\slave.log
+        echo        -----------------------------------------------
+    )
     pause
     exit /b 1
 )
 goto wait_slave
 
 :slave_ready
-echo        [OK] Slave 服务运行中
+echo        OK (Slave running on port !PORT!)
 
-REM ============ 步骤 6: 并行翻译自测 ============
+REM ============ Step 5: Parallel translation self-test ============
 echo.
-echo [6/6] 并行翻译自测（!TEST_PARAGRAPHS! 段，验证机器能干活）...
-.venv\Scripts\python.exe -c "
-import httpx, concurrent.futures, time, sys
-URL = 'http://127.0.0.1:!SLAVE_PORT!/ollama/translate'
-texts = [
-    'Hello world',
-    'Good morning, how are you?',
-    'Artificial intelligence is changing the world.',
-    'Machine learning algorithms require large datasets.',
-    'The quick brown fox jumps over the lazy dog.',
-]
-def trans(text):
-    try:
-        r = httpx.post(URL, json={'text': text, 'target_lang': 'zh'}, timeout=!TEST_TIMEOUT!)
-        r.raise_for_status()
-        return text, r.json().get('translated_text', ''), None
-    except Exception as e:
-        return text, '', str(e)
-
-start = time.time()
-with concurrent.futures.ThreadPoolExecutor(max_workers=!TEST_PARAGRAPHS!) as ex:
-    results = list(ex.map(trans, texts))
-elapsed = time.time() - start
-passed = sum(1 for _, c, e in results if c and not e)
-print(f'  通过: {passed}/!TEST_PARAGRAPHS! | 耗时: {elapsed:.1f}s')
-for t, c, e in results:
-    if e:
-        print(f'  [FAIL] {t[:30]}... -> {e[:50]}')
-    else:
-        print(f'  [OK]   {t[:30]}... -> {c[:40]}')
-sys.exit(0 if passed >= !TEST_PARAGRAPHS! - 1 else 1)
-"
-if %errorlevel% neq 0 (
-    echo [错误] 自测失败（通过数不足）
-    echo        查看日志: slave.log
+echo [5/6] Running parallel translation self-test (!PARAGRAPHS! paragraphs)...
+"!PYEXE!" scripts\slave_selftest.py !PORT!
+if errorlevel 1 (
+    echo [ERROR] Self-test failed
+    echo         Check logs\slave.log for details
+    if exist logs\slave.log (
+        echo        ---------------- logs\slave.log ----------------
+        type logs\slave.log
+        echo        -----------------------------------------------
+    )
     pause
     exit /b 1
 )
 
-REM ============ 检测本机 IP ============
+REM ============ Step 6: Show local IP ============
 echo.
-for /f "tokens=2 delims=:" %%i in ('ipconfig ^| find "IPv4" ^| find "192.168"') do set LOCAL_IP=%%i
-set LOCAL_IP=!LOCAL_IP: =!
-if "!LOCAL_IP!"=="" set LOCAL_IP=127.0.0.1
+echo [6/6] Getting local IP...
+set LOCAL_IP=127.0.0.1
+for /f "tokens=2 delims=:" %%i in ('ipconfig ^| findstr /C:"IPv4"') do (
+    set "TMP=%%i"
+    set "TMP=!TMP: =!"
+    if "!TMP!"=="" continue
+    REM 跳过 127 开头的，取第一个非回环 IP
+    if not "!TMP:~0,3!"=="127" (
+        set "LOCAL_IP=!TMP!"
+        goto got_ip
+    )
+)
+:got_ip
 
-REM ============ 报告 ============
-echo ============================================
-echo   Slave 已就绪
-echo ============================================
-echo   本机 IP:     !LOCAL_IP!
-echo   端口:        !SLAVE_PORT!
-echo   模型:        hunyuan-mt:1.8b-q4
-echo   地址:        http://!LOCAL_IP!:!SLAVE_PORT!
 echo.
-echo   把下面这行复制到 Master 的 master\config.yaml:
+echo ============================================
+echo   SLAVE READY
+echo ============================================
+echo   IP:    !LOCAL_IP!:!PORT!
+echo   URL:   http://!LOCAL_IP!:!PORT!
+echo   Model: %OLLAMA_MODEL% (Ollama backend)
+echo.
+echo   Copy this line into master's master\config.yaml:
 echo.
 echo     - name: "slave-!LOCAL_IP!"
-echo       url: "http://!LOCAL_IP!:!SLAVE_PORT!"
+echo       url: "http://!LOCAL_IP!:!PORT!"
 echo       weight: 1
 echo.
-echo   Slave 服务在后台运行中（最小化窗口）
-echo   停止: taskkill /F /FI "WINDOWTITLE eq LocalTrans-Slave*"
+echo   Slave running in background (minimized window)
+echo   Stop command: taskkill /F /FI "WINDOWTITLE eq LocalTrans-Slave*"
 echo ============================================
 echo.
 pause

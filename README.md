@@ -242,10 +242,11 @@ New-NetFirewallRule -DisplayName "DistributedTranslator" -Direction Inbound -Loc
 ├── master/              # 主机（路由 + 健康检查）
 ├── slave/               # 从机（推理 + 模型管理）
 ├── common/              # 共享协议（schemas.py）
-├── client.py            # Python 客户端
-├── start_master.bat     # 启动主机
-├── start_slave.bat      # 启动从机
-├── install_env.bat      # 安装依赖
-├── Modelfile.hunyuan    # GGUF 导入示例
+├── localtrans/          # Python 客户端包（pip install localtrans）
+├── scripts/             # 自检辅助脚本
+├── install_slave.bat    # Slave 6 步自检 + 启动
+├── install_master.bat   # Master 配置 + 启动
+├── Modelfile.hunyuan    # Ollama 混元模型示例
+├── logs/                # 运行日志（自动创建，git 忽略）
 └── README_en.md         # English version
 ```

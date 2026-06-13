@@ -244,12 +244,14 @@ New-NetFirewallRule -DisplayName "DistraPorts" -Direction Inbound -LocalPort 800
 
 ```
 分布式翻译/
-├── master/              # Master (routing + health check + model management)
-├── slave/               # Slave (inference + model loading/unloading)
+├── master/              # Master (routing + health check)
+├── slave/               # Slave (inference)
 ├── common/              # Shared protocol (schemas.py)
-├── client.py            # Python client library
-├── start_master.bat     # Start master
-├── start_slave.bat      # Start slave
-├── install_env.bat      # Install dependencies
-└── Modelfile.hunyuan    # GGUF → Ollama import example
+├── localtrans/          # Python client package (pip install localtrans)
+├── scripts/             # Self-test helpers
+├── install_slave.bat    # Slave 6-step self-test + start
+├── install_master.bat   # Master config + start
+├── Modelfile.hunyuan    # Ollama Hunyuan model example
+├── logs/                # Runtime logs (auto-created, git-ignored)
+└── README_en.md         # English version
 ```

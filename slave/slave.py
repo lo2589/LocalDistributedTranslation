@@ -8,6 +8,7 @@
 import os
 import sys
 import yaml
+import logging
 import uvicorn
 import httpx
 import asyncio
@@ -17,6 +18,28 @@ from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
 from datetime import datetime
 from pathlib import Path
+
+# ===== 统一日志配置（所有输出进 logs/slave.log + stderr）=====
+_LOG_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "logs")
+os.makedirs(_LOG_DIR, exist_ok=True)
+_LOG_PATH = os.path.join(_LOG_DIR, "slave.log")
+
+# 每次启动清空旧日志，避免无限增长
+try:
+    open(_LOG_PATH, "w").close()
+except Exception:
+    pass
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="[%(asctime)s] [%(levelname)s] [Slave] %(message)s",
+    handlers=[
+        logging.FileHandler(_LOG_PATH, encoding="utf-8"),
+        logging.StreamHandler(sys.stderr),
+    ],
+    force=True,
+)
+logger = logging.getLogger("slave")
 
 # 让 slave 能引用上层的 common
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
@@ -100,14 +123,14 @@ def _download_model_task(model_id: str, cache_dir: str):
     global local_models, download_tasks
     try:
         download_tasks[model_id] = {"status": "downloading", "error": None}
-        print(f"[{datetime.now().isoformat()}] [Slave] 开始下载模型: {model_id}")
+        logger.info(f"开始下载模型: {model_id}")
         path = snapshot_download(repo_id=model_id, cache_dir=cache_dir, local_files_only=False)
         local_models[model_id] = {"path": path, "status": "downloaded"}
         download_tasks[model_id] = {"status": "done", "error": None}
-        print(f"[{datetime.now().isoformat()}] [Slave] 模型下载完成: {model_id}")
+        logger.info(f"模型下载完成: {model_id}")
     except Exception as e:
         download_tasks[model_id] = {"status": "error", "error": str(e)}
-        print(f"[{datetime.now().isoformat()}] [Slave] 模型下载失败: {model_id}, 错误: {e}")
+        logger.warning(f"模型下载失败: {model_id}, 错误: {e}")
 
 def unload_model():
     """卸载当前模型，释放显存/内存"""
@@ -124,8 +147,8 @@ def unload_model():
             torch.cuda.empty_cache()
             torch.cuda.ipc_collect()
     except Exception as e:
-        print(f"[{datetime.now().isoformat()}] [Slave] CUDA 清理跳过: {e}")
-    print(f"[{datetime.now().isoformat()}] [Slave] 旧模型已卸载，显存/内存已清理")
+        logger.warning(f"CUDA 清理跳过: {e}")
+    logger.info("旧模型已卸载，显存/内存已清理")
 
 def load_model(config: dict):
     _ensure_imports()
@@ -135,7 +158,7 @@ def load_model(config: dict):
     model_path = mc["path"]
     model_name = model_path.split("/")[-1]
 
-    print(f"[{datetime.now().isoformat()}] [Slave] 正在加载模型: {model_path}")
+    logger.info(f"正在加载模型: {model_path}")
 
     # 解析 torch_dtype
     dtype_map = {
@@ -170,7 +193,7 @@ def load_model(config: dict):
             if "torch_dtype" in model_kwargs:
                 del model_kwargs["torch_dtype"]
         except Exception as e:
-            print(f"[警告] 量化库不可用或配置失败，回退到普通加载: {e}")
+            logger.warning(f"量化库不可用或配置失败，回退到普通加载: {e}")
 
     # 统一使用 device_map 与低内存加载
     model_kwargs["device_map"] = mc.get("device_map", "auto")
@@ -187,7 +210,7 @@ def load_model(config: dict):
     else:
         device_type = "unknown"
 
-    print(f"[{datetime.now().isoformat()}] [Slave] 模型加载完成 | 名称: {model_name} | 设备: {device_type}")
+    logger.info(f"模型加载完成 | 名称: {model_name} | 设备: {device_type}")
 
 
 # ==================== Prompt 构建 ====================
@@ -238,19 +261,19 @@ async def lifespan(app: FastAPI):
 
     model_cache_dir = cfg.get("model_cache_dir", get_hf_cache_dir())
     local_models = scan_local_models(model_cache_dir)
-    print(f"[{datetime.now().isoformat()}] [Slave] 扫描到本地模型: {list(local_models.keys())}")
+    logger.info(f"扫描到本地模型: {list(local_models.keys())}")
 
     # 尝试加载初始模型；失败则继续运行，等待后续 /models/load
     try:
         load_model(cfg)
     except Exception as e:
-        print(f"[{datetime.now().isoformat()}] [Slave] 初始模型加载失败（可能尚未下载）: {e}")
-        print("[Slave] 提示: 可通过 /models/download 下载模型，再通过 /models/load 加载")
+        logger.warning(f"初始模型加载失败（可能尚未下载）: {e}")
+        logger.info("提示: 可通过 /models/download 下载模型，再通过 /models/load 加载")
 
     yield
     executor.shutdown(wait=False)
     unload_model()
-    print("[Slave] 服务已关闭")
+    logger.info("服务已关闭")
 
 
 app = FastAPI(title="分布式翻译从机", lifespan=lifespan)
@@ -271,8 +294,8 @@ def _ollama_client(base_url: str = "http://localhost:11434") -> httpx.Client:
 @app.post("/ollama/translate")
 async def ollama_translate(req: TranslateRequest):
     """用 Ollama 模型翻译（绕过 transformers/pytorch），直接调 Ollama /api/chat"""
-    ollama_cfg = (cfg.get("ollama", {}) if cfg else {})
-    model_name = ollama_cfg.get("model", "qwen2.5:7b")
+    ollama_cfg = (cfg.get("ollama", {}) if cfg else {}) or {}
+    model_name = ollama_cfg.get("model", "tencent/hy-mt1.5-1.8b-q4")
     base_url = ollama_cfg.get("base_url", "http://localhost:11434")
 
     lang_map = {
@@ -312,8 +335,8 @@ async def ollama_translate(req: TranslateRequest):
 @app.post("/ollama/translate/stream")
 async def ollama_translate_stream(req: TranslateRequest):
     """流式 Ollama 翻译（同步 httpx.Client，FastAPI StreamingResponse 支持）"""
-    ollama_cfg = (cfg.get("ollama", {}) if cfg else {})
-    model_name = ollama_cfg.get("model", "qwen2.5:7b")
+    ollama_cfg = (cfg.get("ollama", {}) if cfg else {}) or {}
+    model_name = ollama_cfg.get("model", "tencent/hy-mt1.5-1.8b-q4")
     base_url = ollama_cfg.get("base_url", "http://localhost:11434")
 
     lang_map = {
@@ -415,7 +438,7 @@ async def _do_load(model_id: str):
         unload_model()
     except Exception as e:
         import traceback
-        print(f"[{datetime.now().isoformat()}] [Slave] unload_model 失败（忽略）: {e}", flush=True)
+        logger.warning(f"unload_model 失败（忽略）: {e}")
         traceback.print_exc()
 
     try:
@@ -428,7 +451,7 @@ async def _do_load(model_id: str):
         }
     except Exception as e:
         import traceback
-        print(f"[{datetime.now().isoformat()}] [Slave] load_model 失败: {e}", flush=True)
+        logger.warning(f"load_model 失败: {e}")
         traceback.print_exc()
         return {"status": "error", "model_id": model_id, "error": str(e)}
 
@@ -443,8 +466,20 @@ async def unload_model_endpoint():
 # ==================== 翻译接口 ====================
 @app.post("/translate")
 async def translate(req: TranslateRequest):
-    if model is None or tokenizer is None:
-        return {"error": "模型未加载，请先调用 /models/load", "status": "error"}
+    # 优先使用本地 transformers 模型
+    if model is not None and tokenizer is not None:
+        return await _translate_transformers(req)
+
+    # 回落到 Ollama 后端
+    ollama_ok, _ = _ollama_available()
+    if ollama_ok:
+        return await ollama_translate(req)
+
+    return {"error": "模型未加载，且 Ollama 后端不可用", "status": "error"}
+
+
+async def _translate_transformers(req: TranslateRequest):
+    """用本地 transformers 模型翻译"""
 
     messages = build_messages(req.text, req.source_lang, req.target_lang, glossary=req.glossary)
 
@@ -537,13 +572,66 @@ async def translate(req: TranslateRequest):
 
 
 # ==================== 健康检查 ====================
+def _ollama_available() -> (bool, str):
+    """检查 Ollama 后端是否可用（无需 transformers/torch）"""
+    try:
+        import httpx
+        base_url = None
+        ollama_model = None
+        if cfg and "ollama" in cfg and isinstance(cfg["ollama"], dict):
+            base_url = cfg["ollama"].get("base_url", "http://localhost:11434")
+            ollama_model = cfg["ollama"].get("model", "")
+        else:
+            base_url = "http://localhost:11434"
+            ollama_model = ""
+
+        client = httpx.Client(base_url=base_url, timeout=5)
+        r = client.get("/api/tags")
+        if r.status_code != 200:
+            return False, ""
+        data = r.json()
+        models = data.get("models", [])
+        if ollama_model:
+            for m in models:
+                if m.get("name", "").startswith(ollama_model):
+                    return True, ollama_model
+            # 配置的模型不在列表
+            return False, ollama_model
+        # 无特定模型配置，只要 Ollama 有任何模型即可用
+        if models:
+            return True, models[0].get("name", "")
+        return False, ""
+    except Exception:
+        return False, ""
+
+
 @app.get("/health")
 async def health():
+    # 1) 本地 transformers 模型
+    if model is not None:
+        return HealthResponse(
+            status="ok",
+            model_loaded=True,
+            model_name=model_name,
+            device=device_type,
+        )
+
+    # 2) Ollama 后端（无需本地模型）
+    ollama_ok, ollama_model_name = _ollama_available()
+    if ollama_ok:
+        return HealthResponse(
+            status="ok",
+            model_loaded=True,
+            model_name="ollama:" + (ollama_model_name or "default"),
+            device="ollama",
+        )
+
+    # 3) 服务运行但无可推理后端
     return HealthResponse(
-        status="ok" if model is not None else "idle",
-        model_loaded=model is not None,
-        model_name=model_name,
-        device=device_type,
+        status="idle",
+        model_loaded=False,
+        model_name=None,
+        device=None,
     )
 
 
