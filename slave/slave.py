@@ -20,15 +20,24 @@ from datetime import datetime
 from pathlib import Path
 
 # ===== 统一日志配置（所有输出进 logs/slave.log + stderr）=====
-_LOG_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "logs")
+_PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_LOG_DIR = os.path.join(_PROJECT_ROOT, "logs")
 os.makedirs(_LOG_DIR, exist_ok=True)
 _LOG_PATH = os.path.join(_LOG_DIR, "slave.log")
 
-# 每次启动清空旧日志，避免无限增长
 try:
     open(_LOG_PATH, "w").close()
 except Exception:
     pass
+
+# Python 3.7 兼容：basicConfig 不支持 force，手动清理 root handlers
+_root = logging.getLogger()
+for _h in list(_root.handlers):
+    try:
+        _h.close()
+    except Exception:
+        pass
+    _root.removeHandler(_h)
 
 logging.basicConfig(
     level=logging.INFO,
@@ -37,7 +46,6 @@ logging.basicConfig(
         logging.FileHandler(_LOG_PATH, encoding="utf-8"),
         logging.StreamHandler(sys.stderr),
     ],
-    force=True,
 )
 logger = logging.getLogger("slave")
 
@@ -287,7 +295,7 @@ def _ollama_client(base_url: str = "http://localhost:11434") -> httpx.Client:
     """获取或创建 Ollama HTTP 客户端"""
     global ollama_http_client
     if ollama_http_client is None:
-        ollama_http_client = httpx.Client(base_url=base_url, timeout=180.0)
+        ollama_http_client = httpx.Client(base_url=base_url, timeout=180.0, trust_env=False)
     return ollama_http_client
 
 
@@ -352,7 +360,7 @@ async def ollama_translate_stream(req: TranslateRequest):
 
     def event_generator():
         try:
-            client = httpx.Client(base_url=base_url, timeout=180.0)
+            client = httpx.Client(base_url=base_url, timeout=180.0, trust_env=False)
             with client.stream("POST", "/api/chat", json={
                 "model": model_name,
                 "messages": [
@@ -585,7 +593,7 @@ def _ollama_available() -> (bool, str):
             base_url = "http://localhost:11434"
             ollama_model = ""
 
-        client = httpx.Client(base_url=base_url, timeout=5)
+        client = httpx.Client(base_url=base_url, timeout=5, trust_env=False)
         r = client.get("/api/tags")
         if r.status_code != 200:
             return False, ""

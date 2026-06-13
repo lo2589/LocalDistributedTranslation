@@ -16,15 +16,24 @@ from typing import List, Optional
 from contextlib import asynccontextmanager
 
 # ===== 统一日志配置（所有输出进 logs/master.log + stderr）=====
-_LOG_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "logs")
+_PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_LOG_DIR = os.path.join(_PROJECT_ROOT, "logs")
 os.makedirs(_LOG_DIR, exist_ok=True)
 _LOG_PATH = os.path.join(_LOG_DIR, "master.log")
 
-# 每次启动清空旧日志，避免无限增长
 try:
     open(_LOG_PATH, "w").close()
 except Exception:
     pass
+
+# Python 3.7 兼容：basicConfig 不支持 force，手动清理 root handlers
+_root = logging.getLogger()
+for _h in list(_root.handlers):
+    try:
+        _h.close()
+    except Exception:
+        pass
+    _root.removeHandler(_h)
 
 logging.basicConfig(
     level=logging.INFO,
@@ -33,7 +42,6 @@ logging.basicConfig(
         logging.FileHandler(_LOG_PATH, encoding="utf-8"),
         logging.StreamHandler(sys.stderr),
     ],
-    force=True,
 )
 logger = logging.getLogger("master")
 
@@ -110,12 +118,12 @@ async def lifespan(app: FastAPI):
         full_cfg = yaml.safe_load(f)
         cfg = full_cfg["master"]
 
-    client = httpx.AsyncClient(timeout=300.0)
+    client = httpx.AsyncClient(timeout=300.0, trust_env=False)
     slaves = [SlaveInfo(**s) for s in cfg["slaves"]]
     recommended_models = cfg.get("recommended_models", [])
 
-    # 启动后先执行一次健康检查，确认初始状态
-    for s in slaves:
+    # 启动后先执行一次健康检查（并行，避免阻塞启动）
+    async def _check(s):
         try:
             r = await client.get(f"{s.url}/health", timeout=5)
             data = r.json()
@@ -125,6 +133,9 @@ async def lifespan(app: FastAPI):
             s.healthy = False
             logger.warning(f"{s.name} 不可达: {e}")
         s.last_check = datetime.now().isoformat()
+
+    if slaves:
+        await asyncio.gather(*[_check(s) for s in slaves], return_exceptions=True)
 
     asyncio.create_task(health_checker())
     logger.info(f"已注册 {len(slaves)} 个从机节点")

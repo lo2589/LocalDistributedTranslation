@@ -37,7 +37,7 @@ def main():
     # 2) 检查 ollama serve 是否在跑
     try:
         import httpx
-        client = httpx.Client(timeout=5)
+        client = httpx.Client(timeout=5, trust_env=False)
         r = client.get("http://127.0.0.1:11434/api/tags")
         if r.status_code != 200:
             print("OLLAMA_NOT_RUNNING (bad status)")

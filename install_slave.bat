@@ -16,7 +16,7 @@ cd /d "%~dp0"
 
 set PORT=8001
 set PARAGRAPHS=5
-set OLLAMA_MODEL=tencent/hy-mt1.5-1.8b-q4
+set OLLAMA_MODEL=hunyuan-mt:1.8b-q4
 
 echo.
 echo ============================================

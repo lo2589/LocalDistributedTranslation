@@ -33,7 +33,7 @@ class TranslatorClient:
     def __init__(self, master_url: Optional[str] = None, timeout: float = 60.0):
         self.master_url = (master_url or get_master_url()).rstrip("/")
         self.timeout = timeout
-        self._client = httpx.Client(timeout=timeout)
+        self._client = httpx.Client(timeout=timeout, trust_env=False)
 
     def health(self) -> dict:
         """Master 健康检查"""

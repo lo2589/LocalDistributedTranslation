@@ -10,7 +10,7 @@ slave:
   # This is the default path used by install_slave.bat.
   ollama:
     base_url: "http://localhost:11434"
-    model: "tencent/hy-mt1.5-1.8b-q4"
+    model: "hunyuan-mt:1.8b-q4"
 
   # Local transformers model config
   # Used when you want to run a model directly with transformers/torch
