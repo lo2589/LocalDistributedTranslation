@@ -66,14 +66,21 @@ ollama list
 # You should see: hunyuan-mt:1.8b-q4
 ```
 
-**Option B: Download GGUF via HuggingFace mirror, then import (if pull is slow)**
+**Option B: Download GGUF from HuggingFace community, then import (if `ollama pull` doesn't work)**
+
+1. Download the GGUF file from HuggingFace (use mirror if needed):
+   - Direct: https://huggingface.co/AngelSlim/Hy-MT1.5-1.8B-Q4_K_M
+   - Mirror (China): https://hf-mirror.com/AngelSlim/Hy-MT1.5-1.8B-Q4_K_M
 
 ```powershell
-# 1. Download GGUF (mirror hf-mirror.com)
+# Download GGUF (adjust URL if using mirror)
 curl -L -o HY-MT1.5-1.8B-Q4_K_M.gguf ^
   "https://hf-mirror.com/AngelSlim/Hy-MT1.5-1.8B-Q4_K_M/resolve/main/Hy-MT1.5-1.8B-Q4_K_M.gguf"
+```
 
-# 2. Import into Ollama (Modelfile.hunyuan is included in the project)
+2. Place the GGUF file in the project root (same folder as `Modelfile.hunyuan`), then import:
+
+```powershell
 ollama create hunyuan-mt:1.8b-q4 -f Modelfile.hunyuan
 ```
 

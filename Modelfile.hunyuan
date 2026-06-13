@@ -1,4 +1,4 @@
-FROM "F:/projects/分布式翻译/HY-MT1.5-1.8B-Q4_K_M.gguf"
+FROM ./HY-MT1.5-1.8B-Q4_K_M.gguf
 
 PARAMETER stop "<|hy_place|><|holder|><|no|><|/>|"
 PARAMETER stop "<|hy_End|>"

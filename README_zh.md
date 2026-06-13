@@ -66,14 +66,21 @@ ollama list
 # 应该看到：hunyuan-mt:1.8b-q4
 ```
 
-**方式 B：从 HuggingFace 镜像下载 GGUF 再导入（网络不行时用）**
+**方式 B：从 HuggingFace 社区下载 GGUF 再导入（`ollama pull` 下不了时用）**
+
+1. 从 HuggingFace 下载 GGUF 文件（国内用镜像）：
+   - 直连：https://huggingface.co/AngelSlim/Hy-MT1.5-1.8B-Q4_K_M
+   - 镜像：https://hf-mirror.com/AngelSlim/Hy-MT1.5-1.8B-Q4_K_M
 
 ```powershell
-# 1. 下载 GGUF 文件（镜像 hf-mirror.com 国内可访问）
+# 下载 GGUF（国内用镜像地址）
 curl -L -o HY-MT1.5-1.8B-Q4_K_M.gguf ^
   "https://hf-mirror.com/AngelSlim/Hy-MT1.5-1.8B-Q4_K_M/resolve/main/Hy-MT1.5-1.8B-Q4_K_M.gguf"
+```
 
-# 2. 导入 Ollama（项目里已有 Modelfile.hunyuan）
+2. 把 GGUF 文件放到项目根目录（和 `Modelfile.hunyuan` 同级），然后导入：
+
+```powershell
 ollama create hunyuan-mt:1.8b-q4 -f Modelfile.hunyuan
 ```
 
